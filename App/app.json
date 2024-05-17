@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "ignitefleetApp",
+    "slug": "ignitefleetApp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#202024"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hernandezvedovatto.ignitefleet"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#202024"
+      },
+      "package": "com.hernandezvedovatto.ignitefleet"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}
