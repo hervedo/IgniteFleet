@@ -1,22 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Alert } from 'react-native'
+import { Alert, FlatList } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
+import dayjs from 'dayjs'
 
-import { useQuery } from '../../libs/realm'
+import { useQuery, useRealm } from '../../libs/realm'
 import { Historic } from '../../libs/realm/schemas/Historic'
 
-import { Container, Content } from './styles'
+import { Container, Content, Label, Title } from './styles'
 
 import { CarStatus } from '../../components/CarStatus'
 import { HomeHeader } from '../../components/HomeHeader'
+import { HistoricCard, HistoricCardProps } from '../../components/HistoricCard'
 
 export function Home() {
 
     const [vehicleInUse, setVehicleInUse] = useState<Historic | null>(null)
+    const [vehicleHistoric, setVehicleHistoric] = useState<HistoricCardProps[]>([])
 
     const { navigate } = useNavigation()
 
     const historic = useQuery(Historic)
+    const realm = useRealm()
 
     function handleRegisterMovement() {
         if (vehicleInUse?._id) {
@@ -28,10 +32,9 @@ export function Home() {
         }
     }
 
-    function handleFetchVehicle() {
+    function fetchVehicleInUse() {
         try {
             const vehicle = historic.filtered("status = 'departure'")[0]
-
             setVehicleInUse(vehicle)
         } catch (error) {
             Alert.alert('Veículo em uso', 'Não foi possível carregar o veículo em uso.')
@@ -40,13 +43,65 @@ export function Home() {
 
     }
 
-    useEffect(() => { handleFetchVehicle }, [])
+    function fetchHistoric() {
+        try {
+            const resultArrival = historic.filtered("status = 'arrival' SORT(created_at DESC")
+
+            const formattedHistoric = resultArrival.map((item) => {
+                return ({
+                    id: item._id.toString(),
+                    licensePlate: item.license_place,
+                    isSync: false,
+                    created: dayjs(item.created_at).format('[Saída em] DD/MM/YYYY [às] HH:mm')
+                })
+            })
+
+            setVehicleHistoric(formattedHistoric)
+
+        } catch (error) {
+            console.log(error)
+            Alert.alert('Histórico', 'Não foi possível carregar o histórico')
+        }
+    }
+
+    function handleHistoricDetails(id: string) {
+        navigate('arrival', { id })
+    }
+
+    useEffect(() => {
+        fetchVehicleInUse()
+    }, [])
+
+
+    useEffect(() => {
+        realm.addListener('change', () => fetchVehicleInUse())
+
+        return () => {
+            if (realm && !realm.isClosed) {
+                realm.removeListener('change', fetchVehicleInUse)
+            }
+        }
+    }, [])
+
+    useEffect(() => { fetchHistoric() }, [historic])
 
     return (
         <Container >
             <HomeHeader />
             <Content>
                 <CarStatus licensePlate={vehicleInUse?.license_place} onPress={handleRegisterMovement} />
+
+                <Title>Histórico</Title>
+
+                <FlatList data={vehicleHistoric} keyExtractor={item => item.id} renderItem={({ item }) => (
+                    <HistoricCard data={item} onPress={() => handleHistoricDetails(item.id)} />
+                )}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: 100 }}
+                    ListEmptyComponent={(
+                        <Label>Nenhum veículo utilizado.</Label>
+                    )}
+                />
             </Content>
         </Container>
     )

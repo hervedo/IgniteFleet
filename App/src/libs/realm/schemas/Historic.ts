@@ -13,8 +13,8 @@ export class Historic extends Realm.Object<Historic> {
     license_place!: string
     description!: string
     status!: string
-    created_at!: string
-    updated_at!: string
+    created_at!: Date
+    updated_at!: Date
 
 
 
