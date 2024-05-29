@@ -7,7 +7,7 @@ flex-diretion: row;
 justify-content: space-between;
 
 backgroud-color: ${({ theme }) => theme.COLORS.GRAY_700};
-z-index: 1;
+
 `
 
 export const Title = styled.Text`
