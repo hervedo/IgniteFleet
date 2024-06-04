@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { Alert, ScrollView, TextInput } from "react-native";
 import { useUser } from "@realm/react";
 import { useNavigation } from '@react-navigation/native'
-import { LocationAccuracy, LocationSubscription, useForegroundPermissions, watchPositionAsync } from 'expo-location'
+import { LocationAccuracy, LocationObjectCoords, LocationSubscription, requestBackgroundPermissionsAsync, useForegroundPermissions, watchPositionAsync } from 'expo-location'
 import { Car } from "phosphor-react-native";
 
 import { useRealm } from "../../libs/realm";
 import { Historic } from "../../libs/realm/schemas/Historic";
 
-import { Container, Content, Message } from "./styles";
+import { Container, Content, Message, MessageContent } from "./styles";
 
 import { Button } from "../../components/Button";
 import { Header } from "../../components/Header";
@@ -20,6 +20,9 @@ import { LocationInfo } from "../../components/LocationInfo";
 import { licensePlateValidate } from "../../utils/licensePlateValidate";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { getAddressLocation } from "../../utils/getAddressLocation";
+import { Map } from "../../components/Map";
+import { startLocationTask } from "../../tasks/backgroundLocationTask";
+import { openSettings } from "../../utils/openSettings";
 
 
 export function Departure() {
@@ -29,6 +32,7 @@ export function Departure() {
     const [isRegistering, setIsRegistering] = useState(false)
     const [isLoadingLocation, setIsLoadingLocation] = useState(true)
     const [currentAddress, setCurrentAddress] = useState<string | null>(null)
+    const [currentCoords, setCurrentCoords] = useState<LocationObjectCoords | null>(null)
 
     const [locationForegroundPermission, requestLocationForegroundPermission] = useForegroundPermissions();
 
@@ -41,7 +45,7 @@ export function Departure() {
     const descriptionRef = useRef<TextInput>(null)
     const licensePlateRef = useRef<TextInput>(null)
 
-    function handleDepartureRegister() {
+    async function handleDepartureRegister() {
         try {
             if (!licensePlateValidate(licensePlate)) {
                 licensePlateRef.current?.focus()
@@ -54,13 +58,39 @@ export function Departure() {
 
             }
 
+            if (!currentCoords?.latitude && !currentCoords?.longitude) {
+                return Alert.alert('Localização!', 'Não foi possível obter a localização atual. Tente Novamente!');
+            }
+
             setIsRegistering(true)
+
+
+            const backgroundPermissions = await requestBackgroundPermissionsAsync()
+
+            if (!backgroundPermissions.granted) {
+                setIsRegistering(false)
+
+                return Alert.alert(
+                    "Localização",
+                    'É necessário permitir que o App tenha acesso a localização em segundo plano. Acesse as configurações do dispositivo e habilite "Permitir o tempo todo".',
+                    [
+                        { text: 'Abrir Configurações', onPress: openSettings }
+                    ]
+                )
+            }
+
+            await startLocationTask();
 
             realm.write(() => {
                 realm.create('Historic', Historic.generate({
                     user_id: user!.id,
                     license_place: licensePlate.toUpperCase(),
-                    description
+                    description,
+                    coords: [{
+                        latitude: currentCoords.latitude,
+                        longitude: currentCoords.longitude,
+                        timestamp: new Date().getTime()
+                    }]
                 }))
             })
 
@@ -95,6 +125,7 @@ export function Departure() {
             timeInterval: 1000
 
         }, (location) => {
+            setCurrentCoords(location.coords)
             getAddressLocation(location.coords).then((address) => {
                 if (address) {
                     setCurrentAddress(address)
@@ -116,9 +147,15 @@ export function Departure() {
         return (
             <Container>
                 <Header title="Saída" />
-                <Message>Você precisa permitir que o App tenha acesso a localização.
-                    Por favor, acesse as configurações do seu dispositivo para conceder a permissão ao App.
-                </Message>
+
+                <MessageContent>
+                    <Message>Você precisa permitir que o App tenha acesso a localização.
+                        Por favor, acesse as configurações do seu dispositivo para conceder a permissão ao App.
+                    </Message>
+
+                    <Button title="Abrir Configurações" onPress={openSettings} />
+
+                </MessageContent>
             </Container>
         )
     }
@@ -135,13 +172,11 @@ export function Departure() {
 
             <KeyboardAwareScrollView extraHeight={100}>
                 <ScrollView>
+                    {currentCoords && <Map coordinates={[currentCoords]} />}
                     <Content>
                         {
                             currentAddress &&
                             <LocationInfo icon={Car} label='Localização Atual' description={currentAddress} />
-
-
-
                         }
 
                         <LicensePlateInput
